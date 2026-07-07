@@ -1,0 +1,6 @@
+{
+  "name": "EatStream",
+  "description": "A Complete Full Stack Food Ordering and Restaurant Management Platform supporting Customers, Kitchen Owners, Delivery Partners, and Admin configurations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

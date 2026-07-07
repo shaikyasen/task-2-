@@ -1,0 +1,141 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper to get user record
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Helper to verify user role
+    function hasRole(role) {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             getUserData().role == role;
+    }
+
+    // Admin has full read/write access to all collections
+    match /{document=**} {
+      allow read, write: if isAuthenticated() && (hasRole('admin') || request.auth.uid == 'admin_dummy_id');
+    }
+
+    // Users Collection rules
+    match /users/{userId} {
+      allow create: if isAuthenticated();
+      allow read, update, delete: if isAuthenticated() && (request.auth.uid == userId || hasRole('admin'));
+    }
+
+    // Restaurants Collection
+    match /restaurants/{restaurantId} {
+      allow read: if true; // Publicly browseable
+      allow create, update: if isAuthenticated() && (hasRole('restaurantOwner') || hasRole('admin'));
+      allow delete: if isAuthenticated() && hasRole('admin');
+    }
+
+    // Foods Collection
+    match /foods/{foodId} {
+      allow read: if true; // Publicly browseable
+      allow create, update, delete: if isAuthenticated() && (hasRole('restaurantOwner') || hasRole('admin'));
+    }
+
+    // Restaurant Categories & Food Categories
+    match /restaurantCategories/{catId} {
+      allow read: if true;
+      allow write: if isAuthenticated() && (hasRole('admin') || hasRole('restaurantOwner'));
+    }
+    match /foodCategories/{catId} {
+      allow read: if true;
+      allow write: if isAuthenticated() && (hasRole('admin') || hasRole('restaurantOwner'));
+    }
+
+    // Orders Collection
+    match /orders/{orderId} {
+      allow create: if isAuthenticated() && (hasRole('customer') || hasRole('admin'));
+      allow read: if isAuthenticated() && (
+        resource.data.customerId == request.auth.uid || 
+        resource.data.restaurantOwnerId == request.auth.uid || 
+        resource.data.deliveryPartnerId == request.auth.uid || 
+        hasRole('admin')
+      );
+      allow update: if isAuthenticated() && (
+        resource.data.customerId == request.auth.uid || 
+        resource.data.restaurantOwnerId == request.auth.uid || 
+        resource.data.deliveryPartnerId == request.auth.uid || 
+        hasRole('admin')
+      );
+      allow delete: if isAuthenticated() && hasRole('admin');
+    }
+
+    // Reviews Collection
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && (resource.data.customerId == request.auth.uid || hasRole('admin'));
+    }
+
+    // Messages / Chat Collection
+    match /messages/{messageId} {
+      allow create: if isAuthenticated();
+      allow read: if isAuthenticated() && (
+        resource.data.senderId == request.auth.uid || 
+        resource.data.receiverId == request.auth.uid || 
+        hasRole('admin')
+      );
+      allow update, delete: if isAuthenticated() && (resource.data.senderId == request.auth.uid || hasRole('admin'));
+    }
+
+    // Delivery Tracking Collection
+    match /deliveryTracking/{trackingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && (hasRole('deliveryPartner') || hasRole('admin'));
+    }
+
+    // Coupons and Offers
+    match /coupons/{couponId} {
+      allow read: if true;
+      allow write: if isAuthenticated() && (hasRole('admin') || hasRole('restaurantOwner'));
+    }
+    match /offers/{offerId} {
+      allow read: if true;
+      allow write: if isAuthenticated() && (hasRole('admin') || hasRole('restaurantOwner'));
+    }
+
+    // Earnings and Wallets
+    match /earnings/{earningId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || hasRole('admin'));
+      allow write: if isAuthenticated() && (hasRole('admin') || hasRole('deliveryPartner') || hasRole('restaurantOwner'));
+    }
+    match /wallet/{walletId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || hasRole('admin'));
+      allow write: if isAuthenticated() && hasRole('admin');
+    }
+
+    // Support Tickets
+    match /supportTickets/{ticketId} {
+      allow create: if isAuthenticated();
+      allow read, update: if isAuthenticated() && (resource.data.userId == request.auth.uid || hasRole('admin'));
+      allow delete: if isAuthenticated() && hasRole('admin');
+    }
+
+    // Banners
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow write: if isAuthenticated() && hasRole('admin');
+    }
+
+    // System Settings and Logs
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAuthenticated() && hasRole('admin');
+    }
+    match /logs/{logId} {
+      allow create: if isAuthenticated() || true;
+      allow read: if isAuthenticated() && hasRole('admin');
+    }
+  }
+}
